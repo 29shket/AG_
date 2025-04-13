@@ -8,6 +8,11 @@ const app = express();
 const port = 3000;
 
 const uploadDir = path.join(__dirname, "uploads");
+const port = process.env.PORT || 3000; // Railway передаст значение переменной PORT
+app.listen(port, () => {
+  console.log(`Сервер запущен на порту ${port}`);
+});
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
