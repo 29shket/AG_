@@ -1,98 +1,60 @@
 const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
-const bodyParser = require("body-parser");
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
 const fs = require("fs");
-
+const path = require("path");
 const app = express();
-const PORT = 3000;
+const port = 3000;
 
-// Настройка хранилища файлов
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = "./uploads";
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    cb(null, dir);
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
+    cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
 const upload = multer({ storage });
 
 app.use(cors());
-app.use(bodyParser.json());
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(express.json());
 
-// Настройка базы данных
-const db = new sqlite3.Database("./files.db");
+const files = [];
 
-db.run(`
-    CREATE TABLE IF NOT EXISTS files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        path TEXT
-    )
-`);
-
-// Маршрут для загрузки файлов
-app.post("/upload", upload.single("file"), (req, res) => {
-  const file = req.file;
-  db.run(
-    `INSERT INTO files (name, path) VALUES (?, ?)`,
-    [file.originalname, file.path],
-    (err) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ error: "Ошибка при сохранении файла в базе данных" });
-      }
-      res.json({ message: "Файл загружен", file });
-    }
-  );
-});
-
-// Маршрут для получения списка файлов
 app.get("/files", (req, res) => {
-  db.all(`SELECT * FROM files`, (err, rows) => {
-    if (err) {
-      return res
-        .status(500)
-        .json({ error: "Ошибка при получении списка файлов" });
-    }
-    res.json(rows);
-  });
+  res.json(files);
 });
 
-// Маршрут для удаления файлов
+app.post("/upload", upload.single("file"), (req, res) => {
+  const file = {
+    id: Date.now().toString(),
+    name: req.file.originalname,
+    path: req.file.filename,
+  };
+  files.push(file);
+  res.json({ message: "File uploaded successfully" });
+});
+
 app.delete("/files/:id", (req, res) => {
   const fileId = req.params.id;
-  db.get(`SELECT path FROM files WHERE id = ?`, [fileId], (err, row) => {
-    if (err || !row) {
-      return res.status(404).json({ error: "Файл не найден" });
-    }
+  const fileIndex = files.findIndex((file) => file.id === fileId);
 
-    fs.unlink(row.path, (fsErr) => {
-      if (fsErr) {
-        return res.status(500).json({ error: "Ошибка при удалении файла" });
-      }
-
-      db.run(`DELETE FROM files WHERE id = ?`, [fileId], (dbErr) => {
-        if (dbErr) {
-          return res
-            .status(500)
-            .json({ error: "Ошибка при удалении записи из базы данных" });
-        }
-        res.json({ message: "Файл успешно удален" });
-      });
-    });
-  });
+  if (fileIndex !== -1) {
+    const [deletedFile] = files.splice(fileIndex, 1);
+    fs.unlinkSync(path.join(uploadDir, deletedFile.path));
+    res.json({ message: "File deleted successfully" });
+  } else {
+    res.status(404).json({ error: "File not found" });
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+app.use("/uploads", express.static(uploadDir));
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
 });
