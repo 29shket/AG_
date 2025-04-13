@@ -3,6 +3,7 @@ const fileTableBody = document.getElementById("fileTableBody");
 async function loadFiles() {
   try {
     const response = await fetch("http://localhost:3000/files");
+    if (!response.ok) throw new Error("Ошибка загрузки файлов с сервера");
     const files = await response.json();
     fileTableBody.innerHTML = "";
     files.forEach((file) => {
@@ -13,7 +14,8 @@ async function loadFiles() {
       );
     });
   } catch (error) {
-    console.error("Ошибка загрузки файлов:", error);
+    console.error("Ошибка при загрузке файлов:", error);
+    alert("Не удалось загрузить файлы.");
   }
 }
 
@@ -26,21 +28,25 @@ async function uploadFile(file) {
       method: "POST",
       body: formData,
     });
+    if (!response.ok) throw new Error("Ошибка загрузки файла");
     await response.json();
     loadFiles();
   } catch (error) {
     console.error("Ошибка загрузки файла:", error);
+    alert("Ошибка при загрузке файла.");
   }
 }
 
 async function deleteFile(fileId, row) {
   try {
-    await fetch(`http://localhost:3000/files/${fileId}`, {
+    const response = await fetch(`http://localhost:3000/files/${fileId}`, {
       method: "DELETE",
     });
+    if (!response.ok) throw new Error("Ошибка удаления файла");
     row.remove();
   } catch (error) {
     console.error("Ошибка удаления файла:", error);
+    alert("Ошибка при удалении файла.");
   }
 }
 
@@ -62,6 +68,7 @@ function addFileToTable(id, name, url) {
   const deleteCell = document.createElement("td");
   const deleteButton = document.createElement("button");
   deleteButton.textContent = "Удалить";
+  deleteButton.className = "btn btn-danger btn-sm";
   deleteButton.addEventListener("click", () => deleteFile(id, row));
   deleteCell.appendChild(deleteButton);
   row.appendChild(deleteCell);
