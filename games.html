@@ -15,10 +15,6 @@
       integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
       crossorigin="anonymous"
     ></script>
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <link rel="manifest" href="/site.webmanifest" />
     <style>
       body {
         background-color: #000000;
@@ -97,20 +93,54 @@
     </table>
 
     <script>
+      // Вставьте ваш JavaScript-код сюда
       const fileTableBody = document.getElementById("fileTableBody");
 
-      function loadFiles() {
-        const savedFiles = JSON.parse(
-          localStorage.getItem("uploadedFiles") || "[]"
-        );
-        savedFiles.forEach((file) => addFileToTable(file.name, file.url));
+      async function loadFiles() {
+        try {
+          const response = await fetch("http://localhost:3000/files");
+          const files = await response.json();
+          fileTableBody.innerHTML = "";
+          files.forEach((file) => {
+            addFileToTable(
+              file.id,
+              file.name,
+              `http://localhost:3000/uploads/${file.path}`
+            );
+          });
+        } catch (error) {
+          console.error("Ошибка загрузки файлов:", error);
+        }
       }
 
-      function saveFiles(files) {
-        localStorage.setItem("uploadedFiles", JSON.stringify(files));
+      async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("http://localhost:3000/upload", {
+            method: "POST",
+            body: formData,
+          });
+          await response.json();
+          loadFiles();
+        } catch (error) {
+          console.error("Ошибка загрузки файла:", error);
+        }
       }
 
-      function addFileToTable(name, url) {
+      async function deleteFile(fileId, row) {
+        try {
+          await fetch(`http://localhost:3000/files/${fileId}`, {
+            method: "DELETE",
+          });
+          row.remove();
+        } catch (error) {
+          console.error("Ошибка удаления файла:", error);
+        }
+      }
+
+      function addFileToTable(id, name, url) {
         const row = document.createElement("tr");
 
         const nameCell = document.createElement("td");
@@ -128,14 +158,7 @@
         const deleteCell = document.createElement("td");
         const deleteButton = document.createElement("button");
         deleteButton.textContent = "Удалить";
-        deleteButton.addEventListener("click", () => {
-          const savedFiles = JSON.parse(
-            localStorage.getItem("uploadedFiles") || "[]"
-          );
-          const updatedFiles = savedFiles.filter((file) => file.name !== name);
-          saveFiles(updatedFiles);
-          row.remove();
-        });
+        deleteButton.addEventListener("click", () => deleteFile(id, row));
         deleteCell.appendChild(deleteButton);
         row.appendChild(deleteCell);
 
@@ -145,16 +168,7 @@
       document.getElementById("uploadButton").addEventListener("click", () => {
         const fileInput = document.getElementById("fileInput");
         if (fileInput.files.length > 0) {
-          const file = fileInput.files[0];
-          const fileURL = URL.createObjectURL(file);
-
-          addFileToTable(file.name, fileURL);
-
-          const savedFiles = JSON.parse(
-            localStorage.getItem("uploadedFiles") || "[]"
-          );
-          savedFiles.push({ name: file.name, url: fileURL });
-          saveFiles(savedFiles);
+          uploadFile(fileInput.files[0]);
         } else {
           alert("Пожалуйста, выберите файл для загрузки.");
         }
